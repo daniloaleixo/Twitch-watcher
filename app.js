@@ -5,11 +5,12 @@ const cheerio = require('cheerio');
 var fs = require('fs');
 const inquirer = require('./input');
 const treekill = require('tree-kill');
+const { Console } = require('console');
 
 var run = true;
 var firstRun = true;
 var cookie = null;
-var streamers = null;
+var streamer = process.env.streamer || 'bla';
 // ========================================== CONFIG SECTION =================================================================
 const configPath = './config.json'
 const screenshotFolder = './screenshots/';
@@ -20,13 +21,9 @@ const streamersUrl = (process.env.streamersUrl || 'https://www.twitch.tv/directo
 const scrollDelay = (Number(process.env.scrollDelay) || 2000);
 const scrollTimes = (Number(process.env.scrollTimes) || 5);
 
-const minWatching = (Number(process.env.minWatching) || 15); // Minutes
-const maxWatching = (Number(process.env.maxWatching) || 30); //Minutes
+const timeToRefresh = (Number(process.env.timeToRefresh) || 30); //Minutes
 
-const streamerListRefresh = (Number(process.env.streamerListRefresh) || 1);
-const streamerListRefreshUnit = (process.env.streamerListRefreshUnit || 'hour'); //https://day.js.org/docs/en/manipulate/add
-
-const showBrowser = false; // false state equ headless mode;
+const showBrowser = true; // false state equ headless mode;
 const proxy = (process.env.proxy || ""); // "ip:port" By https://github.com/Jan710
 const proxyAuth = (process.env.proxyAuth || "");
 
@@ -61,8 +58,7 @@ const streamQualityQuery = 'input[data-a-target="tw-radio"]';
 
 
 
-async function viewRandomPage(browser, page) {
-  var streamer_last_refresh = dayjs().add(streamerListRefresh, streamerListRefreshUnit);
+async function viewPage(browser, page) {
   var browser_last_refresh = dayjs().add(browserClean, browserCleanUnit);
   while (run) {
     try {
@@ -74,17 +70,11 @@ async function viewRandomPage(browser, page) {
         browser_last_refresh = dayjs().add(browserClean, browserCleanUnit);
       }
 
-      if (dayjs(streamer_last_refresh).isBefore(dayjs())) {
-        await getAllStreamer(page); //Call getAllStreamer function and refresh the list
-        streamer_last_refresh = dayjs().add(streamerListRefresh, streamerListRefreshUnit); //https://github.com/D3vl0per/Valorant-watcher/issues/25
-      }
+      var sleep = timeToRefresh * 60000; //Set watuching timer
 
-      let watch = streamers[getRandomInt(0, streamers.length - 1)]; //https://github.com/D3vl0per/Valorant-watcher/issues/27
-      var sleep = getRandomInt(minWatching, maxWatching) * 60000; //Set watuching timer
+      console.log('\n🔗 Now watching streamer: ', baseUrl + streamer);
 
-      console.log('\n🔗 Now watching streamer: ', baseUrl + watch);
-
-      await page.goto(baseUrl + watch, {
+      await page.goto(baseUrl + streamer, {
         "waitUntil": "networkidle0"
       }); //https://github.com/puppeteer/puppeteer/blob/master/docs/api.md#pagegobackoptions
 
@@ -122,9 +112,9 @@ async function viewRandomPage(browser, page) {
           }
         });
         await page.screenshot({
-          path: `${screenshotFolder}${watch}.png`
+          path: `${screenshotFolder}${streamer}.png`
         });
-        console.log('📸 Screenshot created: ' + `${watch}.png`);
+        console.log('📸 Screenshot created: ' + `${streamer}.png`);
       }
 
       await clickWhenExist(page, sidebarQuery); //Open sidebar
@@ -235,28 +225,6 @@ async function spawnBrowser() {
 
 
 
-async function getAllStreamer(page) {
-  console.log("=========================");
-  await page.goto(streamersUrl, {
-    "waitUntil": "networkidle0"
-  });
-  console.log('🔐 Checking login...');
-  await checkLogin(page);
-  console.log('📡 Checking active streamers...');
-  await scroll(page, scrollTimes);
-  const jquery = await queryOnWebsite(page, channelsQuery);
-  streamers = null;
-  streamers = new Array();
-
-  console.log('🧹 Filtering out html codes...');
-  for (var i = 0; i < jquery.length; i++) {
-    streamers[i] = jquery[i].attribs.href.split("/")[1];
-  }
-  return;
-}
-
-
-
 async function checkLogin(page) {
   let cookieSetByServer = await page.cookies();
   for (var i = 0; i < cookieSetByServer.length; i++) {
@@ -289,13 +257,6 @@ async function scroll(page, times) {
   return;
 }
 
-
-
-function getRandomInt(min, max) {
-  min = Math.ceil(min);
-  max = Math.floor(max);
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
 
 
 
@@ -332,14 +293,6 @@ async function cleanup(browser, page) {
 
 
 
-async function killBrowser(browser, page) {
-  const pages = await browser.pages();
-  await pages.map((page) => page.close());
-  treekill(browser.process().pid, 'SIGKILL');
-  return;
-}
-
-
 
 async function shutDown() {
   console.log("\n👋Bye Bye👋");
@@ -357,10 +310,21 @@ async function main() {
     browser,
     page
   } = await spawnBrowser();
-  await getAllStreamer(page);
+
+
+  console.log('>> Browser ready')
+
+  console.log('Navigating to home page...')
+  await page.goto(baseUrl, {
+    "waitUntil": "networkidle0"
+  });
+  console.log('🔐 Checking login...');
+  await checkLogin(page);
+  // await scroll(page, scrollTimes);
+
   console.log("=========================");
   console.log('🔭 Running watcher...');
-  await viewRandomPage(browser, page);
+  await viewPage(browser, page);
 };
 
 main();
