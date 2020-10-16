@@ -16,11 +16,6 @@ const configPath = './config.json'
 const screenshotFolder = './screenshots/';
 const baseUrl = 'https://www.twitch.tv/';
 const userAgent = (process.env.userAgent || 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36');
-const streamersUrl = (process.env.streamersUrl || 'https://www.twitch.tv/directory/game/VALORANT?tl=c2542d6d-cd10-4532-919b-3d19f30a768b');
-
-const scrollDelay = (Number(process.env.scrollDelay) || 2000);
-const scrollTimes = (Number(process.env.scrollTimes) || 5);
-
 const timeToRefresh = (Number(process.env.timeToRefresh) || 30); //Minutes
 
 const showBrowser = true; // false state equ headless mode;
@@ -81,50 +76,64 @@ async function viewPage(browser, page) {
       await clickWhenExist(page, cookiePolicyQuery);
       await clickWhenExist(page, matureContentQuery); //Click on accept button
 
-      if (firstRun) {
-        console.log('🔧 Setting lowest possible resolution..');
-        await clickWhenExist(page, streamPauseQuery);
 
-        await clickWhenExist(page, streamSettingsQuery);
-        await page.waitFor(streamQualitySettingQuery);
+      let bodyHTML = await page.evaluate(() => document.body.innerHTML);
+      const isOffline = !!bodyHTML.match(/is offline/g)
 
-        await clickWhenExist(page, streamQualitySettingQuery);
-        await page.waitFor(streamQualityQuery);
-
-        var resolution = await queryOnWebsite(page, streamQualityQuery);
-        resolution = resolution[resolution.length - 1].attribs.id;
-        await page.evaluate((resolution) => {
-          document.getElementById(resolution).click();
-        }, resolution);
-
-        await clickWhenExist(page, streamPauseQuery);
-
-        await page.keyboard.press('m'); //For unmute
-        firstRun = false;
+      if (isOffline) {
+        console.log('💡 Stream is offline');
+        console.log('🕒 Time: ' + dayjs().format('HH:mm:ss'));
+        console.log('💤 Sleeping for ' + sleep / 60000 + ' minutes\n');
       }
+      else {
+        // Setting mute and low res
+        if (firstRun) {
+          console.log('🔧 Setting lowest possible resolution..');
+          await clickWhenExist(page, streamPauseQuery);
+
+          await clickWhenExist(page, streamSettingsQuery);
+          await page.waitFor(streamQualitySettingQuery);
+
+          await clickWhenExist(page, streamQualitySettingQuery);
+          await page.waitFor(streamQualityQuery);
+
+          var resolution = await queryOnWebsite(page, streamQualityQuery);
+          resolution = resolution[resolution.length - 1].attribs.id;
+          await page.evaluate((resolution) => {
+            document.getElementById(resolution).click();
+          }, resolution);
+
+          await clickWhenExist(page, streamPauseQuery);
+
+          await page.keyboard.press('m'); //For unmute
+          firstRun = false;
+        }
 
 
-      if (browserScreenshot) {
-        await page.waitFor(1000);
-        fs.access(screenshotFolder, error => {
-          if (error) {
-            fs.promises.mkdir(screenshotFolder);
-          }
-        });
-        await page.screenshot({
-          path: `${screenshotFolder}${streamer}.png`
-        });
-        console.log('📸 Screenshot created: ' + `${streamer}.png`);
+
+        // Browser screen shot
+        if (browserScreenshot) {
+          await page.waitFor(1000);
+          fs.access(screenshotFolder, error => {
+            if (error) {
+              fs.promises.mkdir(screenshotFolder);
+            }
+          });
+          await page.screenshot({
+            path: `${screenshotFolder}${streamer}.png`
+          });
+          console.log('📸 Screenshot created: ' + `${streamer}.png`);
+        }
+
+        await clickWhenExist(page, sidebarQuery); //Open sidebar
+        await page.waitFor(userStatusQuery); //Waiting for sidebar
+        let status = await queryOnWebsite(page, userStatusQuery); //status jQuery
+        await clickWhenExist(page, sidebarQuery); //Close sidebar
+
+        console.log('💡 Account status:', status[0] ? status[0].children[0].data : "Unknown");
+        console.log('🕒 Time: ' + dayjs().format('HH:mm:ss'));
+        console.log('💤 Watching stream for ' + sleep / 60000 + ' minutes\n');
       }
-
-      await clickWhenExist(page, sidebarQuery); //Open sidebar
-      await page.waitFor(userStatusQuery); //Waiting for sidebar
-      let status = await queryOnWebsite(page, userStatusQuery); //status jQuery
-      await clickWhenExist(page, sidebarQuery); //Close sidebar
-
-      console.log('💡 Account status:', status[0] ? status[0].children[0].data : "Unknown");
-      console.log('🕒 Time: ' + dayjs().format('HH:mm:ss'));
-      console.log('💤 Watching stream for ' + sleep / 60000 + ' minutes\n');
 
       await page.waitFor(sleep);
     } catch (e) {
@@ -175,7 +184,7 @@ async function readLoginData() {
 
       let input = await inquirer.askLogin();
 
-      fs.writeFile(configPath, JSON.stringify(input), function(err) {
+      fs.writeFile(configPath, JSON.stringify(input), function (err) {
         if (err) {
           console.log(err);
         }
@@ -244,21 +253,6 @@ async function checkLogin(page) {
 
 
 
-async function scroll(page, times) {
-  console.log('🔨 Emulating scrolling...');
-
-  for (var i = 0; i < times; i++) {
-    await page.evaluate(async (page) => {
-      var x = document.getElementsByClassName("scrollable-trigger__wrapper");
-      x[0].scrollIntoView();
-    });
-    await page.waitFor(scrollDelay);
-  }
-  return;
-}
-
-
-
 
 async function clickWhenExist(page, query) {
   let result = await queryOnWebsite(page, query);
@@ -269,7 +263,7 @@ async function clickWhenExist(page, query) {
       await page.waitFor(500);
       return;
     }
-  } catch (e) {}
+  } catch (e) { }
 }
 
 

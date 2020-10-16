@@ -7,8 +7,6 @@ services:
     environment:
       - token=gh5el7927s9yz2h9tzgdvdc2e7d2ls #Example value from readme
       - userAgent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/78.0.3904.108 Safari/537.36
-      - scrollDelay=2000
-      - scrollTimes=5
       - timeToRefresh=1
       - browserScreenshot=false
       - streamer=bla
