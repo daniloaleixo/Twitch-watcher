@@ -55,6 +55,7 @@ const streamQualityQuery = 'input[data-a-target="tw-radio"]';
 
 async function viewPage(browser, page) {
   var browser_last_refresh = dayjs().add(browserClean, browserCleanUnit);
+  var initClock = new Date()
   while (run) {
     try {
       if (dayjs(browser_last_refresh).isBefore(dayjs())) {
@@ -130,8 +131,9 @@ async function viewPage(browser, page) {
         let status = await queryOnWebsite(page, userStatusQuery); //status jQuery
         await clickWhenExist(page, sidebarQuery); //Close sidebar
 
+        const timeDiff = new Date() - initClock;
         console.log('💡 Account status:', status[0] ? status[0].children[0].data : "Unknown");
-        console.log('🕒 Time: ' + dayjs().format('HH:mm:ss'));
+        console.log('🕒 Time: ' + dayjs().format('HH:mm:ss'), '- having been watching for ', Math.round(timeDiff / 1000 / 60), ' minutes');
         console.log('💤 Watching stream for ' + sleep / 60000 + ' minutes\n');
       }
 
